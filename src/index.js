@@ -69,28 +69,86 @@ app.use((req, res) => {
     });
 });
 
-// Database connection
+// Database connection - Cloud MongoDB Only
 const connectDB = async () => {
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+
+    console.log('');
+    console.log('╔════════════════════════════════════════════════╗');
+    console.log('║       🔄 MongoDB Connection Initializing       ║');
+    console.log('╚════════════════════════════════════════════════╝');
+    console.log('');
+
+    // Check if URI is configured
+    if (!mongoUri) {
+        console.error('❌ ERROR: No MongoDB URI configured!');
+        console.error('');
+        console.error('   Please set MONGO_URI in your .env file:');
+        console.error('   MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/dbname');
+        console.error('');
+        process.exit(1);
+    }
+
+    // Log connection attempt (hide password)
+    const safeUri = mongoUri.replace(/:([^:@]+)@/, ':****@');
+    console.log('📍 Target:', safeUri);
+    console.log('⏳ Attempting connection...');
+    console.log('');
+
     try {
-        // Try to connect to configured MongoDB first
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/community-signal', {
-            serverSelectionTimeoutMS: 5000 // 5 second timeout
+        // Connection options
+        const options = {
+            serverSelectionTimeoutMS: 10000, // 10 second timeout
+            socketTimeoutMS: 45000,
+            maxPoolSize: 10,
+        };
+
+        console.log('� Options: timeout=10s, poolSize=10');
+
+        await mongoose.connect(mongoUri, options);
+
+        // Connection successful
+        console.log('');
+        console.log('╔════════════════════════════════════════════════╗');
+        console.log('║   ✅ MongoDB Atlas Connected Successfully!     ║');
+        console.log('╠════════════════════════════════════════════════╣');
+        console.log('║   📊 Database: ' + (mongoose.connection.name || 'connected').padEnd(31) + '║');
+        console.log('║   🌐 Host: ' + (mongoose.connection.host || 'cloud').substring(0, 35).padEnd(35) + '║');
+        console.log('║   � Storage: Cloud (Persistent)               ║');
+        console.log('╚════════════════════════════════════════════════╝');
+        console.log('');
+
+        // Connection event listeners for debugging
+        mongoose.connection.on('error', (err) => {
+            console.error('❌ MongoDB connection error:', err.message);
         });
-        console.log('✅ MongoDB connected successfully');
+
+        mongoose.connection.on('disconnected', () => {
+            console.warn('⚠️ MongoDB disconnected. Attempting to reconnect...');
+        });
+
+        mongoose.connection.on('reconnected', () => {
+            console.log('✅ MongoDB reconnected successfully!');
+        });
+
     } catch (error) {
-        console.log('⚠️ Local MongoDB not available, starting in-memory MongoDB...');
-        try {
-            // Use mongodb-memory-server for development
-            const { MongoMemoryServer } = require('mongodb-memory-server');
-            const mongoServer = await MongoMemoryServer.create();
-            const mongoUri = mongoServer.getUri();
-            await mongoose.connect(mongoUri);
-            console.log('✅ In-memory MongoDB connected successfully');
-            console.log('📝 Note: Data will be lost when server restarts');
-        } catch (memError) {
-            console.error('❌ MongoDB connection error:', memError.message);
-            process.exit(1);
-        }
+        console.error('');
+        console.error('╔════════════════════════════════════════════════╗');
+        console.error('║   ❌ MongoDB Connection FAILED                 ║');
+        console.error('╚════════════════════════════════════════════════╝');
+        console.error('');
+        console.error('🔍 Error Details:');
+        console.error('   Name:', error.name);
+        console.error('   Message:', error.message);
+        console.error('');
+        console.error('🛠️  Troubleshooting:');
+        console.error('   1. Check your MONGO_URI in .env file');
+        console.error('   2. Verify username/password are correct');
+        console.error('   3. Ensure IP is whitelisted in MongoDB Atlas');
+        console.error('   4. Check your internet connection');
+        console.error('   5. Verify cluster is running in Atlas dashboard');
+        console.error('');
+        process.exit(1);
     }
 };
 

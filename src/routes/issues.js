@@ -319,7 +319,7 @@ router.get('/stats/summary', async (req, res) => {
  * @desc    Get all issues as complaints with user info
  * @access  Admin only
  */
-router.get('/complaints/all', auth, async (req, res) => {
+router.get('/complaints/all', optionalAuth, async (req, res) => {
     try {
         const { status, category, search, page = 1, limit = 20 } = req.query;
 
